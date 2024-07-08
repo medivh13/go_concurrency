@@ -26,14 +26,13 @@ This is an example Go project demonstrating how to use concurrency to fetch data
 1. Clone the repository:
 
     ```sh
-    git clone https://github.com/yourusername/yourproject.git
-    cd yourproject
+    git clone https://github.com/medivh13/go_concurrency.git
+    cd go_concurrency
     ```
 
 2. Initialize the Go modules:
 
     ```sh
-    go mod init yourproject
     go mod tidy
     ```
 
