@@ -1,6 +1,9 @@
 package usecases
 
-import "go_concurrency/src/repository"
+import (
+	"go_concurrency/src/repository"
+	"sync"
+)
 
 // FetcherUsecase defines the interface for fetcher usecases.
 type FetcherUsecase interface {
@@ -19,47 +22,51 @@ func NewFetcherUsecase(repo repository.FetcherRepository) FetcherUsecase {
 
 // FetchURLsConcurrently fetches multiple URLs concurrently.
 func (uc *fetcherUsecase) FetchURLsConcurrently(urls []string) []string {
-    // Create a channel to communicate results from goroutines
-    ch := make(chan string)
-    
-    // Iterate over each URL
-    for _, url := range urls {
-        // Launch a goroutine to fetch each URL concurrently
-        go func(url string) {
-            result, err := uc.fetcherRepo.FetchURL(url)
-            if err != nil {
-                // Send the error message to the channel if an error occurs
-                ch <- err.Error()
-            } else {
-                // Send the result to the channel if successful
-                ch <- result
-            }
-        }(url)
-    }
+	var wg sync.WaitGroup              // WaitGroup to wait for all goroutines to complete
+	ch := make(chan string, len(urls)) // Buffered channel to prevent blocking
 
-    var results []string
-    // Collect results from the channel for each URL
-    for range urls {
-        results = append(results, <-ch)
-    }
+	// Iterate over each URL and launch a goroutine
+	for _, url := range urls {
+		wg.Add(1) // Increment the WaitGroup counter
+		go func(url string) {
+			defer wg.Done() // Decrement the counter when the goroutine finishes
+			result, err := uc.fetcherRepo.FetchURL(url)
+			if err != nil {
+				ch <- err.Error() // Send the error message to the channel
+			} else {
+				ch <- result // Send the successful result to the channel
+			}
+		}(url)
+	}
 
-    return results
+	// Launch a separate goroutine to close the channel when all goroutines finish
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	var results []string
+	// Collect results from the channel
+	for result := range ch {
+		results = append(results, result)
+	}
+
+	return results
 }
 
 // FetchURLsSequentially fetches multiple URLs sequentially.
 func (uc *fetcherUsecase) FetchURLsSequentially(urls []string) []string {
-    var results []string
-    // Iterate over each URL and fetch them one by one
-    for _, url := range urls {
-        result, err := uc.fetcherRepo.FetchURL(url)
-        if err != nil {
-            // Append the error message to results if an error occurs
-            results = append(results, err.Error())
-        } else {
-            // Append the result to results if successful
-            results = append(results, result)
-        }
-    }
-    return results
+	var results []string
+	// Iterate over each URL and fetch them one by one
+	for _, url := range urls {
+		result, err := uc.fetcherRepo.FetchURL(url)
+		if err != nil {
+			// Append the error message to results if an error occurs
+			results = append(results, err.Error())
+		} else {
+			// Append the result to results if successful
+			results = append(results, result)
+		}
+	}
+	return results
 }
-
